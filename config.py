@@ -39,8 +39,7 @@ SSH: `git@github.com:{owner}/{repo}.git`
 
 aliases: dict[t.Literal[
     'checkout',
-    'push',
-    'delete' # TODO
+    'push'
 ], list[str]] = {
     'checkout': [
         'checkout',
