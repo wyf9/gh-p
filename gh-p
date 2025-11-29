@@ -44,7 +44,7 @@ def main() -> None | int:
             number=p.pr_number
         )
         l.info(f'Checking out PR #{p.pr_number} -> Local {branch}')
-        u.run(f'gh pr checkout {p.pr_number} --branch {branch} {' '.join(p.all_others[2:])}', capture=False)
+        u.run(f"gh pr checkout {p.pr_number} --branch {branch} {' '.join(p.all_others[2:])}", capture=False)
         l.success('Checkout done')
         return
 
@@ -80,7 +80,7 @@ def main() -> None | int:
 
         # push
         l.info(f'Pushing to {info.owner}/{info.repo}@{info.branch}...')
-        u.run(f'git push {c.temp_remote_name} HEAD:{info.branch} {' '.join(p.all_others[2:])}', capture=False)
+        u.run(f"git push {c.temp_remote_name} HEAD:{info.branch} {' '.join(p.all_others[2:])}", capture=False)
         l.success(f'Push done')
 
         # remove remote
