@@ -40,22 +40,29 @@ def main() -> None | int:
         if not p.pr_number:
             l.error(f'Please provide PR # number!')
             return 1
-        branch = f'{c.pr_branch_prefix}{p.pr_number}'
+        branch = c.pr_branch_format.format(
+            number=p.pr_number
+        )
         l.info(f'Checking out PR #{p.pr_number} -> Local {branch}')
-        u.run(f'gh pr checkout {p.pr_number} --branch {branch} {' '.join(p.all_others[2:])}')
+        u.run(f'gh pr checkout {p.pr_number} --branch {branch} {' '.join(p.all_others[2:])}', capture=False)
         l.success('Checkout done')
         return
 
     # * Push
     if p.cmd == 'push':
         if not p.pr_number:
-            l.error(f'Please provide PR # number!')
-            return 1
+            # try
+            p.pr_number = u.guess_pr()
+
+            if not p.pr_number:
+                # still not found
+                l.error(f'Please provide PR # number!')
+                return 1
 
         # get pr info
         info = u.get_pr(p.pr_number)
         l.verbose(f'PR info: branch {info.branch}, owner {info.owner}, repo: {info.repo}')
-        if (not info.owner) or (not info.repo):
+        if (not info.owner) or (not info.repo) or (not info.branch):
             l.error(f'Cannot found owner and(or) repo information!')
             return 2
 
@@ -69,12 +76,17 @@ def main() -> None | int:
         else:
             l.verbose(f'Edit remote: {c.temp_remote_name} -> {remote_url}')
             u.run(f'git remote remove {c.temp_remote_name}', check_err=False)
-            u.run(f'git remote add {c.temp_remote_name} {remote_url}')
+            u.run(f'git remote add {c.temp_remote_name} {remote_url} --no-tags')
 
         # push
         l.info(f'Pushing to {info.owner}/{info.repo}@{info.branch}...')
         u.run(f'git push {c.temp_remote_name} HEAD:{info.branch} {' '.join(p.all_others[2:])}', capture=False)
         l.success(f'Push done')
+
+        # remove remote
+        l.verbose(f'Remove remote {c.temp_remote_name}')
+        u.run(f'git remote remove {c.temp_remote_name}', check_err=False)
+        return
 
 
 if __name__ == '__main__':

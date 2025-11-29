@@ -1,13 +1,14 @@
 # coding: utf-8
 
-from subprocess import run as orig_run
+import re
+from subprocess import run as orig_run, TimeoutExpired
 from pathlib import Path
 import sys
 import json
-import argparse
 import typing as t
 
 import log as l
+import config as c
 
 
 def run(cmd: str | list[str], check_err: bool = True, timeout: float | None = None, capture: bool = True) -> str:
@@ -27,10 +28,14 @@ def run(cmd: str | list[str], check_err: bool = True, timeout: float | None = No
         args['stdout'] = sys.stdout
         args['stderr'] = sys.stderr
 
-    result = orig_run(cmd, shell=True, text=True, cwd=Path.cwd(), **args)
+    try:
+        result = orig_run(cmd, shell=True, text=True, cwd=Path.cwd(), **args)
+    except TimeoutExpired:
+        l.e(f'Command {cmd} expired after {timeout} seconds!')
+        exit(3)
 
     if check_err and result.returncode != 0:
-        l.e(f'Command return isn\'t 0: {result.returncode}\n{result.stderr.strip()}')
+        l.e(f'Command {cmd} return isn\'t 0: {result.returncode}\n{result.stderr.strip()}')
         exit(result.returncode)
 
     return result.stdout.strip() if capture else ''
@@ -46,82 +51,9 @@ def get_pr(pr_num: int) -> _get_pr_ret:
     j: dict = json.loads(run(f"gh pr view {pr_num} --json headRefName,headRepositoryOwner,headRepository"))
     r = _get_pr_ret()
     r.branch = j.get('headRefName')
-    r.owner = j.get('headRepositoryOwner')
-    r.repo = j.get('headRepository')
+    r.owner = j.get('headRepositoryOwner', {}).get('login')
+    r.repo = j.get('headRepository', {}).get('name')
     return r
-
-
-class Old_Args(argparse.Namespace):
-    verbose: bool = False
-    dry_run: bool = False
-    help: bool = False
-
-    pr_number: int | None = None
-    force: bool = False
-    subcommand: str | None = None
-    passthrough: list[str] = []
-
-
-def old_parse_args() -> Old_Args:
-    """
-    完全适配 `gh p` 扩展，完美解决：
-    - 任意未知子命令自动透传给官方 gh pr
-    - gh p checkout 不带参数时显示官方帮助
-    - gh p 125 自动识别为 push
-    """
-    print(sys.argv)
-    # 第一步：快速判断是否直接透传
-    if len(sys.argv) <= 1:
-        # 只有 gh p 或者 gh p -h
-        return Old_Args(subcommand='', help=True)
-
-    first_arg = sys.argv[1]
-
-    # 情况1：用户直接输入数字 → 自动当成 push
-    if first_arg.isdigit():
-        return Old_Args(
-            subcommand="push",
-            pr_number=int(first_arg),
-            force=False,
-            verbose=False,
-            dry_run=False,
-            help=False,
-            passthrough=[]
-        )
-
-    # 情况2：明确是我们支持的子命令（checkout / push）
-    if first_arg in ["checkout", "co", "push", "ps", "-h", "--help"]:
-        parser = argparse.ArgumentParser(
-            # prog="gh p",
-            description="Enhanced PR workflow: checkout & push",
-            add_help=False,
-        )
-        parser.add_argument("-v", "--verbose", action="store_true")
-        parser.add_argument("--dry-run", action="store_true")
-        parser.add_argument("-f", "--force", action="store_true")
-        parser.add_argument("-h", "--help", action="store_true")
-
-        if first_arg in ["checkout", "co"]:
-            parser.add_argument("pr_number", type=int, nargs="?")
-            args = parser.parse_args()
-            args.subcommand = "checkout"
-            return args  # type: ignore
-
-        elif first_arg in ["push", "ps"]:
-            parser.add_argument("pr_number", type=int, nargs="?")
-            args = parser.parse_args()
-            args.subcommand = "push"
-            return args  # type: ignore
-
-        else:  # -h / --help
-            return Old_Args(subcommand="passthrough", passthrough=["--help"])
-
-    # 情况3：其他所有 → 直接透传给官方 gh pr
-    else:
-        return Old_Args(
-            subcommand="passthrough",
-            passthrough=sys.argv[1:]  # 把所有参数原样传给 gh pr
-        )
 
 
 def lstget(lst: list, key: int, default: t.Any = None) -> t.Any:
@@ -189,14 +121,14 @@ def parse_args() -> Args:
 
     # subcommands
     first_arg: str = lstget(r.params, 0, None)
-    if first_arg in ['checkout', 'co', 'c']:
+    if first_arg in c.aliases['checkout']:
         # checkout
         r.cmd = 'checkout'
         l.verbose(f'[parse] set cmd -> checkout')
         if local_flag_help:
             r.flag_help = 'checkout'
             l.verbose('[parse] set flag_help -> checkout')
-    elif first_arg in ['push', 'ps', 'p']:
+    elif first_arg in c.aliases['push']:
         # push
         r.cmd = 'push'
         l.verbose(f'[parse] set cmd -> push')
@@ -212,3 +144,72 @@ def parse_args() -> Args:
 
     # passthrough if no subcmd
     return r
+
+
+def extract_pr_number_from_branch(name: str) -> int | None:
+    for pattern, strict in c.pr_branch_matches:
+        regex = pattern.format(
+            number=r'(\d+)'
+        )
+
+        if regex.endswith('-*'):
+            regex = regex[:-2] + r'-\d*[^\d].*'
+        elif '*' in regex:
+            regex = regex.replace('*', '.*')
+
+        if strict:
+            if not regex.startswith('^'):
+                regex = f'^{regex}'
+            if not regex.endswith('$'):
+                regex = f'{regex}$'
+
+        l.v(f'[extract] try {pattern} (strict: {strict}) -> regex: {regex}')
+
+        match = re.search(regex, name)
+        if match:
+            try:
+                l.v(f'[extract] matched: {match.group(1)}')
+                return int(match.group(1))
+            except (IndexError, ValueError):
+                pass
+
+    l.v('[extract] failed to extranch pr from branch name')
+    return
+
+
+def detect_pr_number_from_gh_checkout_ref() -> int | None:
+    try:
+        curr_commit = run("git rev-parse HEAD", check_err=False).strip()
+        if not curr_commit:
+            l.verbose(f'[detect] no commit found')
+            return
+        l.verbose(f'[detect] current commit: {curr_commit}')
+
+        output = run('git for-each-ref --format="%(refname) %(objectname)"')
+        for line in output.splitlines():
+            if not line.strip():
+                continue
+            refname, commit = line.strip().split(' ', 1)
+            if commit == curr_commit:
+                if m := re.search(r'refs/pull/(\d+)/head', refname):
+                    l.verbose(f'[detect] found: {m.group(1)}')
+                    return int(m.group(1))
+    except Exception as e:
+        l.verbose(f'[detect] failed: {e}')
+
+    return None
+
+
+def guess_pr() -> int | None:
+    # try to get from ref
+    ret = None
+    ret = detect_pr_number_from_gh_checkout_ref()
+    l.verbose(f'[guess] detect return: {ret}')
+
+    if not ret:
+        # try to get from branch
+        branch = run("git rev-parse --abbrev-ref HEAD").strip()
+        ret = extract_pr_number_from_branch(branch)
+        l.verbose(f'[guess] extract return: {ret}')
+
+    return ret
