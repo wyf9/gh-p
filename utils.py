@@ -8,7 +8,7 @@ import json
 import typing as t
 
 import log as l
-import config as c
+from config import config as c
 
 
 def run(cmd: str | list[str], check_err: bool = True, timeout: float | None = None, capture: bool = True) -> str:

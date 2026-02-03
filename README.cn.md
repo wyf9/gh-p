@@ -68,34 +68,42 @@ gh p push -h       # push 命令帮助
 
 ## ⚙️ 配置
 
-首先 Clone / Fork 本 Repo,
+你可以编辑以下文件中的一个来自定义本工具行为 *(优先级从上到下)*:
 
-并编辑 config.py 来自定义行为：
+- `~/.wyf9/gh-p.json`
+- `~/.wyf9/gh-p/config.json`
+- `~/.config/gh-p.json`
+- `~/.config/gh-p/config.json`
 
-```python
-# 本地分支命名
-pr_branch_format = 'gh-pull-{number}'
+```jsonc
+{
+    // 本地分支命名
+    "pr_branch_format": "gh-pull-{number}",
 
-# PR 号码提取模式
-pr_branch_matches = [
-    ('gh-pull-{number}', True),
-    ('gh-{number}', False),
-    # 添加您的自定义模式
-]
+    // PR 号码提取模式
+    // 格式: [模式，是否默认]
+    "pr_branch_matches": [
+        ["gh-pull-{number}", true],
+        ["gh-{number}", false],
+        // 添加你的自定义模式
+    ],
 
-# 远程配置
-temp_remote_name = 'gh-pull-temp'
-remote_url = 'https://github.com/{owner}/{repo}.git'
+    // 远程配置
+    "temp_remote_name": "gh-pull-temp",
+    "remote_url": "https://github.com/{owner}/{repo}.git", // ssh: git@github.com:{owner}/{repo}.git
 
-# 命令别名
-aliases = {
-    'checkout': ['checkout', 'co', 'c'],
-    'push': ['push', 'p']
+    // 命令别名
+    "aliases": {
+        "checkout": ["checkout", "co", "c"],
+        "push": ["push", "p"]
+    }
 }
 ```
+
+详见 [`config.py`](./config.py).
 
 ## 📄 协议
 
 MIT License.
 
-Copyright (c) 2025 wyf9, All rights reserved.
+Copyright (c) 2026 wyf9.

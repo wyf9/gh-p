@@ -68,34 +68,44 @@ gh p push -h       # Push command help
 
 ## ⚙️ Configuration
 
-Clone / Fork this repo first,
+You can customize the tool's behavior by creating/editing one of the following files *(checked in this order, first found wins)*:
 
-then edit config.py to customize behavior:
+- `~/.wyf9/gh-p.json`
+- `~/.wyf9/gh-p/config.json`
+- `~/.config/gh-p.json`
+- `~/.config/gh-p/config.json`
 
-```python
-# Local branch naming
-pr_branch_format = 'gh-pull-{number}'
+Example configuration:
 
-# PR number extraction patterns
-pr_branch_matches = [
-    ('gh-pull-{number}', True),
-    ('gh-{number}', False),
-    # Add your custom patterns
-]
+```jsonc
+{
+    // Local branch naming format
+    "pr_branch_format": "gh-pull-{number}",
 
-# Remote configuration
-temp_remote_name = 'gh-pull-temp'
-remote_url = 'https://github.com/{owner}/{repo}.git'
+    // PR number extraction patterns from branch name
+    // Format: [pattern, is_default]
+    "pr_branch_matches": [
+        ["gh-pull-{number}", true],
+        ["gh-{number}", false],
+        // Add your custom patterns here
+    ],
 
-# Command aliases
-aliases = {
-    'checkout': ['checkout', 'co', 'c'],
-    'push': ['push', 'p']
+    // Remote configuration
+    "temp_remote_name": "gh-pull-temp",
+    "remote_url": "https://github.com/{owner}/{repo}.git", // or ssh: "git@github.com:{owner}/{repo}.git"
+
+    // Command aliases
+    "aliases": {
+        "checkout": ["checkout", "co", "c"],
+        "push": ["push", "p"]
+    }
 }
 ```
+
+Details see [`config.py`](./config.py).
 
 ## 📄 License
 
 MIT License.
 
-Copyright (c) 2025 wyf9, All rights reserved.
+Copyright (c) 2026 wyf9.

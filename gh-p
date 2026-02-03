@@ -1,28 +1,26 @@
 #!/usr/bin/env python3
 # coding: utf-8
 
+from os import system
+
 import log as l
 import utils as u
-import config as c
+from config import config as c
 import help
 
 
 def show_help(args: u.Args):
     l.verbose(f'Show help for {args.flag_help}')
-    if args.flag_help == 'checkout':
-        # Checkout
-        print(help.checkout)
-    elif args.flag_help == 'push':
-        # Push
-        print(help.push)
-    else:
-        # General
-        print(help.general)
+    print(getattr(help, args.flag_help))
 
 
 def main() -> None | int:
     p = u.parse_args()
     l.is_verbose = p.flag_verbose
+
+    if p.flag_verbose:
+        for k, v in c.__dict__.items():
+            l.verbose(f'[config] {k} : {v}')
 
     # * Show Help
     if p.flag_help:
@@ -32,7 +30,8 @@ def main() -> None | int:
     # * Passthrough -> original gh pr commands
     if p.cmd == '':
         l.verbose(f'Passthrough: gh pr {" ".join(p.all_others)}')
-        u.run(['gh', 'pr'] + p.all_others, capture=False)
+        # u.run(['gh', 'pr'] + p.all_others, capture=False)
+        system(f'gh pr {" ".join(p.all_others)}')
         return
 
     # * Checkout
