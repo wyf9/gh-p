@@ -29,11 +29,17 @@ general: str = f'''
   {c.WHITE}-v, --verbose{c.RESET}       Enable verbose output for debugging
 
 {c.BOLD}Configuration{c.RESET}
-  Edit config.py to customize:
-  • Local branch naming format
-  • PR number extraction patterns  
-  • Remote URL format (HTTPS/SSH)
-  • Command aliases
+  Create/edit one of these config files (first found wins):
+  • ~/.wyf9/gh-p.json
+  • ~/.wyf9/gh-p/config.json
+  • ~/.config/gh-p.json
+  • ~/.config/gh-p/config.json
+
+  Customizable options:
+  • Local branch naming format (pr_branch_format)
+  • PR number extraction patterns (pr_branch_matches)
+  • Remote URL format (HTTPS/SSH) (remote_url)
+  • Command aliases (aliases)
 
 {c.BOLD}The Open-source repository address for this project{c.RESET}
   {c.WHITE}https://github.com/wyf9/gh-p{c.RESET}
@@ -63,8 +69,12 @@ checkout: str = f'''
   3. Checks out the branch for development
 
 {c.BOLD}CONFIGURATION{c.RESET}
-  • Branch format: {c.WHITE}pr_branch_format{c.RESET} in config.py
+  • Branch format: {c.WHITE}pr_branch_format{c.RESET} in config file
   • Default: {c.YELLOW}"gh-pull-{{number}}"{c.RESET}
+  • Example config file:
+    {c.WHITE}{{
+      "pr_branch_format": "gh-pull-{{number}}"
+    }}{c.RESET}
 '''[1:-1]
 
 push: str = f'''
@@ -102,7 +112,16 @@ push: str = f'''
   • Configure patterns in {c.WHITE}pr_branch_matches{c.RESET}
 
 {c.BOLD}CONFIGURATION{c.RESET}
-  • Remote URL: {c.WHITE}remote_url{c.RESET} in config.py (HTTPS/SSH)
+  • Remote URL: {c.WHITE}remote_url{c.RESET} in config file (HTTPS/SSH)
   • Temp remote name: {c.WHITE}temp_remote_name{c.RESET}
   • Branch matching: {c.WHITE}pr_branch_matches{c.RESET}
+  • Example config file:
+    {c.WHITE}{{
+      "remote_url": "https://github.com/{{owner}}/{{repo}}.git",
+      "temp_remote_name": "gh-pull-temp",
+      "pr_branch_matches": [
+        ["gh-pull-{{number}}", true],
+        ["gh-{{number}}", false]
+      ]
+    }}{c.RESET}
 '''[1:-1]
